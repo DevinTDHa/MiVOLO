@@ -1,24 +1,30 @@
 from collections import defaultdict
-from typing import Dict, Generator, List, Optional, Tuple
+from typing import Dict, Generator, List, Optional, Tuple, Union
 
 import cv2
 import numpy as np
 import tqdm
+from mivolo.data.misc import prepare_classification_images
 from mivolo.model.mi_volo import MiVOLO
 from mivolo.model.yolo_detector import Detector
 from mivolo.structures import AGE_GENDER_TYPE, PersonAndFaceResult
 import torch
+from collections import namedtuple
 
 
 class Predictor:
     def __init__(self, config, verbose: bool = False):
-        self.detector = Detector(
-            config.detector_weights, config.device, verbose=verbose
-        )
+        if config.detector_weights:
+            self.detector = Detector(
+                config.detector_weights, config.device, verbose=verbose
+            )
+        else:
+            self.detector = None
+
         self.age_gender_model = MiVOLO(
             config.checkpoint,
             config.device,
-            half=True,
+            half=config.half,
             use_persons=config.with_persons,
             disable_faces=config.disable_faces,
             verbose=verbose,
@@ -97,6 +103,14 @@ class Predictor:
         ) = self.age_gender_model.prepare_crops(img_x, detected_bboxes)
         return faces_input, person_input
 
+    def prepare_input_nobbox(self, imgs: List[np.ndarray]):
+        assert type(imgs) == list, "imgs should be a list of images"
+        return prepare_classification_images(
+            imgs,
+            mean=self.age_gender_model.data_config["mean"],
+            std=self.age_gender_model.data_config["std"],
+        )
+
     def inference_grads(
         self, faces_input: torch.Tensor, person_input: torch.Tensor = None
     ):
@@ -151,3 +165,33 @@ class Predictor:
             x_denormed[i] = cv2.cvtColor(x_denormed[i], cv2.COLOR_BGR2RGB)
 
         return x_denormed
+
+
+def get_predictor(
+    checkpoint: str,
+    detector_weights: Union[str, None] = None,
+    with_persons: bool = False,
+    disable_faces: bool = False,
+    device: str = "cuda",
+    draw: bool = True,
+    half: bool = False,
+):
+    ConfigTuple = namedtuple(
+        "ConfigTuple",
+        [
+            "detector_weights",
+            "checkpoint",
+            "with_persons",
+            "disable_faces",
+            "device",
+            "draw",
+            "half",
+        ],
+    )
+
+    config = ConfigTuple(
+        detector_weights, checkpoint, with_persons, disable_faces, device, draw, half
+    )
+
+    predictor = Predictor(config=config, verbose=False)
+    return predictor
