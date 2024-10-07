@@ -1,3 +1,4 @@
+#!/bin/bash
 
 python3 demo.py \
 --input "jennifer_lawrence.jpg" \

@@ -6,8 +6,9 @@ import cv2
 import torch
 import yt_dlp
 from mivolo.data.data_reader import InputType, get_all_files, get_input_type
-from mivolo.predictor import Predictor
 from timm.utils import setup_default_logging
+
+from mivolo.predictor import Predictor
 
 _logger = logging.getLogger("inference")
 
@@ -35,27 +36,67 @@ def get_local_video_info(vid_uri):
     cap = cv2.VideoCapture(vid_uri)
     if not cap.isOpened():
         raise ValueError(f"Failed to open video source {vid_uri}")
-    res = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+    res = (
+        int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+        int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+    )
     fps = cap.get(cv2.CAP_PROP_FPS)
     return res, fps
 
 
 def get_parser():
     parser = argparse.ArgumentParser(description="PyTorch MiVOLO Inference")
-    parser.add_argument("--input", type=str, default=None, required=True, help="image file or folder with images")
-    parser.add_argument("--output", type=str, default=None, required=True, help="folder for output results")
-    parser.add_argument("--detector-weights", type=str, default=None, required=True, help="Detector weights (YOLOv8).")
-    parser.add_argument("--checkpoint", default="", type=str, required=True, help="path to mivolo checkpoint")
-
     parser.add_argument(
-        "--with-persons", action="store_true", default=False, help="If set model will run with persons, if available"
+        "--input",
+        type=str,
+        default=None,
+        required=True,
+        help="image file or folder with images",
     )
     parser.add_argument(
-        "--disable-faces", action="store_true", default=False, help="If set model will use only persons if available"
+        "--output",
+        type=str,
+        default=None,
+        required=True,
+        help="folder for output results",
+    )
+    parser.add_argument(
+        "--detector-weights",
+        type=str,
+        default=None,
+        required=True,
+        help="Detector weights (YOLOv8).",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        default="",
+        type=str,
+        required=True,
+        help="path to mivolo checkpoint",
     )
 
-    parser.add_argument("--draw", action="store_true", default=False, help="If set, resulted images will be drawn")
-    parser.add_argument("--device", default="cuda", type=str, help="Device (accelerator) to use.")
+    parser.add_argument(
+        "--with-persons",
+        action="store_true",
+        default=False,
+        help="If set model will run with persons, if available",
+    )
+    parser.add_argument(
+        "--disable-faces",
+        action="store_true",
+        default=False,
+        help="If set model will use only persons if available",
+    )
+
+    parser.add_argument(
+        "--draw",
+        action="store_true",
+        default=False,
+        help="If set, resulted images will be drawn",
+    )
+    parser.add_argument(
+        "--device", default="cuda", type=str, help="Device (accelerator) to use."
+    )
 
     return parser
 
@@ -76,7 +117,9 @@ def main():
 
     if input_type == InputType.Video or input_type == InputType.VideoStream:
         if not args.draw:
-            raise ValueError("Video processing is only supported with --draw flag. No other way to visualize results.")
+            raise ValueError(
+                "Video processing is only supported with --draw flag. No other way to visualize results."
+            )
 
         if "youtube" in args.input:
             args.input, res, fps, yid = get_direct_video_url(args.input)
@@ -93,15 +136,16 @@ def main():
             out = cv2.VideoWriter(outfilename, fourcc, fps, res)
             _logger.info(f"Saving result to {outfilename}..")
 
-        for (detected_objects_history, frame) in predictor.recognize_video(args.input):
+        for detected_objects_history, frame in predictor.recognize_video(args.input):
             if args.draw:
                 out.write(frame)
 
     elif input_type == InputType.Image:
-        image_files = get_all_files(args.input) if os.path.isdir(args.input) else [args.input]
+        image_files = (
+            get_all_files(args.input) if os.path.isdir(args.input) else [args.input]
+        )
 
         for img_p in image_files:
-
             img = cv2.imread(img_p)
             detected_objects, out_im = predictor.recognize(img)
 
